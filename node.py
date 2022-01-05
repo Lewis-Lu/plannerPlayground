@@ -24,14 +24,15 @@ class node:
         self._isClosed = False
         self._predecessor = None
 
-    def __str__(self):
-        return f'Node @ Grid({self._x},{self._y})--G({self._G})'
-
-    def __lt__(self, that):
-        return self._F < that.F
-
     def __repr__(self) -> str:
         pass
+
+    def __str__(self):
+        return f'Node @ Grid({self._x},{self._y})--G({self._G})--F({self._F})'
+
+    def __lt__(self, that):
+        ''' less than comparison used in the heap '''
+        return self._F < that.F
 
     def __eq__(self, __o: object) -> bool:
         return self._x == __o._x and self._y == __o._y

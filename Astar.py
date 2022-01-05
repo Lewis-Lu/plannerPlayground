@@ -8,160 +8,109 @@
 
 from heapq import heappush, heappop, heapify
 import numpy as np
-import matplotlib.pyplot as plt
 from node import node
 from mapping import maper
+import param
 
 class Astar:
-    def __init__(self, mapFilename, start, goal) -> None:
+    def __init__(self, mapFilename, resolution) -> None:
         self.map = maper(mapFilename)
-        self.map.degenerate(1) # set resolution to 0.1m
+        self.map.degenerate(resolution)
+        self.map.createCartesianGridMap()
         self._resolution = self.map.resolution
-        self.min_x = 0
-        self.min_y = 0
-        self.max_x = self.map.width
-        self.max_y = self.map.height
-        self._start = [np.uint8(start[0]/self._resolution), np.uint8(start[1]/self._resolution)]
-        self._goal = [np.uint8(goal[0]/self._resolution), np.uint8(goal[1]/self._resolution)]
+        self._xlimCartesian = self.map.xlim
+        self._ylimCartesian = self.map.ylim
+        self._start = [int(param.start[0]/self._resolution)-1, int(param.start[1]/self._resolution)-1]  # convert coordinate into the pixel
+        self._goal = [int(param.goal[0]/self._resolution)-1, int(param.goal[1]/self._resolution)-1] # convert coordinate into the pixel
         self._nnDir = [[1,0],[0,-1],[-1,0],[0,1]]
         self._nodeDict = {}
         self._nodeVisitNum = 0
         self._path = []
 
-    @property
-    def start(self):
-        return self._start
-    
-    @start.setter
-    def start(self, val):
-        if(len(val) != 2):
-            raise ValueError("the dimension of the start should be 2")
-        self._start = val
-        
-    @property
-    def goal(self):
-        return self._goal
-    
-    @goal.setter
-    def goal(self, val):
-        if(len(val) != 2):
-            raise ValueError("the dimension of the goal should be 2")
-        self._goal = val
-
     def getPath(self):
         return self._path.reverse()
 
     def isGoal(self, cur: object, goal: object) -> bool:
+        """cur and goal is the object of the class node"""
         return cur == goal
 
     def findNeighbours(self, cur: object) -> list:
-        x = cur._x
-        y = cur._y
-        nn = []
-        for trans in self._nnDir:
-            nn_tmp = [trans[0] + x, trans[1] + y]
-            # sanity check
-            if self.map.getGridVal(nn_tmp[0], nn_tmp[1]) != 0 and nn_tmp[0] > self.min_x and nn_tmp[0] < self.max_x and nn_tmp[1] > self.min_y and nn_tmp[1] < self.max_y:
-                nn.append(nn_tmp)
+        x = cur.X # obtain the x coordinate through getter function
+        y = cur.Y # obstain the y coordinate through getter function
+        nn = [] # list for neighbours
+        for dir in self._nnDir:
+            nn_tmp = [dir[0] + x, dir[1] + y]
+            if nn_tmp[0] >= self._xlimCartesian[0] and nn_tmp[0] < self._xlimCartesian[1] and nn_tmp[1] >= self._ylimCartesian[0] and nn_tmp[1] < self._ylimCartesian[1]:
+                if self.map.cartIm[nn_tmp[0], nn_tmp[1]] != 0:
+                    nn.append(nn_tmp)
         return nn
 
-    def plan(self) -> object:
-        startNode = node(self._start)
+    def planOnCartesian(self) -> object:
+        # # build up the cartesian x-y limits
+        min_x = self._xlimCartesian[0]
+        max_x = self._xlimCartesian[1]
+        min_y = self._ylimCartesian[0]
+        max_y = self._ylimCartesian[1]
+
+        startNode = node(self._start) # startNode Initialization
+        goalNode = node(self._goal) # goalNode Initialization
+        startNode.F = startNode.heurisitic_manhattan(goalNode) # F-score for the startnode equals to the heuristic value
         openSet = []
         heappush(openSet, startNode)
         while openSet:
-            current = heappop(openSet)
-            self._nodeDict[current._x * self.max_x + current._y] = current
+            current = heappop(openSet) # the node in the openSet with lowest F-score
+            # print(current)
+            currentIdx = current.X*max_x + current.Y
+            self._nodeDict[currentIdx] = current
             self._nodeVisitNum += 1
-            # reach the goal
-            if self.isGoal(current, node(self._goal)):
+            if self.isGoal(current, goalNode): # reach the goal
                 return current
-            current._isClosed = True
-            current._isVisited = True
+            # current._isClosed = True
             # explore the neighbours
             nn = self.findNeighbours(current)
             if len(nn) == 0:
-                # no neighbours, pop the next from the priority queue
+                # no neighbours for current node, search in the queue
                 continue
+            # for each neighbour of the current node
             for n in nn:
                 ngbNode = node(n)
                 ngbNode.G = current.G + 1
-                ngbNode.F = ngbNode.G + ngbNode.heurisitic_manhattan(node(self._goal))
-                if not self._nodeDict.get(n[0] * self.max_x + n[1]):
-                    # neighbour not visited, add to the dictionary and update its predecessor
-                    heappush(openSet, ngbNode)
-                    self._nodeDict[n[0] * self.max_x + n[1]] = ngbNode
-                    ngbNode._predecessor = current
-                    ngbNode._isVisited = True
-                else:
-                    # neighbout visited, update if can
-                    nd = self._nodeDict[n[0] * self.max_x + n[1]]
-                    if nd.F < ngbNode.F:
+                ngbNode.F = ngbNode.G + ngbNode.heurisitic_manhattan(goalNode)
+                nIndex = n[0]*max_x + n[1]
+                try:
+                    # neighbour visited before
+                    tentative_nd = self._nodeDict[nIndex]
+                    if tentative_nd.F < ngbNode.F:
                         continue
                     else:
-                        nd.F = ngbNode.F
-                        nd._predecessor = current
+                        tentative_nd.G = ngbNode.G
+                        tentative_nd.F = tentative_nd.G + tentative_nd.heurisitic_manhattan(goalNode)
+                        tentative_nd._predecessor = current
+                        self._nodeDict[nIndex] = tentative_nd # update
+                except:
+                    # neighbour not visited, add to the dictionary and update its predecessor
+                    heappush(openSet, ngbNode)
+                    self._nodeDict[nIndex] = ngbNode # add new neighbour into the dictionary
+                    ngbNode._predecessor = current
+                    # ngbNode._isVisited = True
         return None
 
     def retrievePath(self):
-        res = self.plan()
+        res = self.planOnCartesian()
         if res:
             while res:
-                
                 self._path.append([res._x, res._y])
                 res = res._predecessor
-            
-    def plotGridEnv(self):
-        fig = plt.figure()
-        ax = plt.subplot(111)
-        plt.axis("equal")
-        # plt.grid(True, linestyle='-')
-
-        plot_margin = 5;
-
-        plt.ylim(self.min_y - plot_margin, self.max_y + 1 + plot_margin)
-        plt.xlim(self.min_x - plot_margin, self.max_x + 1 + plot_margin)
-
-        # for i in range(len(self.obstacle)):
-        #     # define x linspace
-        #     x = np.linspace(self.obstacle[i][0], self.obstacle[i][0] + self.resolution, 2)
-        #     ax.fill_between(x, self.obstacle[i][1], self.obstacle[i][1] + self.resolution, facecolor='black', linestyle='-', edgecolor='black')
-        
-        for i in self._path:
-            x = np.linspace(i[0], i[0] + self.resolution, 2)
-            ax.fill_between(x, i[1], i[1] + self.resolution, facecolor='yellow', linestyle='-', edgecolor='black')
-
-        # set the start point 
-        x = np.linspace(self._start[0], self._start[0] + self._resolution, 2)
-        ax.fill_between(x, self._start[1], self._start[1] + self._resolution, facecolor='green', linestyle='-', edgecolor='black')
-
-        # set the goal point
-        x = np.linspace(self._goal[0], self._goal[0] + self._resolution, 2)
-        ax.fill_between(x, self._goal[1], self._goal[1] + self._resolution, facecolor='blue', linestyle='-', edgecolor='black')
-        plt.show()
-    
-
-    def convertToCV(self, path) -> None:
-        pathGreyColor = 125
-        for p in path:
-            self.map.im[p.X, p.Y] = pathGreyColor
-        self.map.preview()
-
+        else:
+            raise RuntimeError("No path")
 
 def main():
     print('Astar planner started.')
-    planner = Astar('maps/warehouse.pgm', [10,10], [30,30])
-    endNode = planner.plan()
-    if endNode:
-        print("Goal Reached")
-        print(endNode)
-        cur = endNode
-        path = []
-        while cur:
-            print(cur)
-            path.append(cur)
-            cur = cur._predecessor
-    planner.convertToCV(path)
+    planner = Astar('maps/warehouse.pgm', 0.2)
+    planner.retrievePath()
+    path = planner._path
+    planner.map.cartesianResult(param.start, param.goal, path)
 
+    
 if __name__ == '__main__':
     main()
