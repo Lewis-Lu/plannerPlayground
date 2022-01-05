@@ -11,6 +11,7 @@ import numpy as np
 from node import node
 from mapping import maper
 import param
+import os
 
 class Astar:
     def __init__(self, mapFilename, resolution) -> None:
@@ -58,9 +59,17 @@ class Astar:
         openSet = []
         heappush(openSet, startNode)
         while openSet:
+            # print("**********************")
+            # for p in openSet:
+            #     print(p)
+            # print("current node:")
+            # print(openSet[0])
+            # print("**********************")
+            # os.system("pause")
+
+            heapify(openSet)
             current = heappop(openSet) # the node in the openSet with lowest F-score
-            # print(current)
-            currentIdx = current.X*max_x + current.Y
+            currentIdx = current.Y*max_x + current.X
             self._nodeDict[currentIdx] = current
             self._nodeVisitNum += 1
             if self.isGoal(current, goalNode): # reach the goal
@@ -76,7 +85,7 @@ class Astar:
                 ngbNode = node(n)
                 ngbNode.G = current.G + 1
                 ngbNode.F = ngbNode.G + ngbNode.heurisitic_manhattan(goalNode)
-                nIndex = n[0]*max_x + n[1]
+                nIndex = n[1]*max_x + n[0]
                 try:
                     # neighbour visited before
                     tentative_nd = self._nodeDict[nIndex]
@@ -104,13 +113,16 @@ class Astar:
         else:
             raise RuntimeError("No path")
 
+def extractVisited(dict):
+    return dict.values()
+
 def main():
     print('Astar planner started.')
-    planner = Astar('maps/warehouse.pgm', 0.2)
+    planner = Astar('maps/warehouse.pgm', 0.1)
     planner.retrievePath()
     path = planner._path
-    planner.map.cartesianResult(param.start, param.goal, path)
-
+    planner.map.cartesianResult(param.start, param.goal, path, extractVisited(planner._nodeDict))
+    print(f"#node visited = {planner._nodeVisitNum}")
     
 if __name__ == '__main__':
     main()

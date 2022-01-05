@@ -69,7 +69,16 @@ class maper:
         self.ylim = [0, self.rows]
         print(f"Cartesian gird map built: xlim:{self.xlim}, ylim:{self.ylim}")
 
-    def cartesianResult(self, startInMeter, goalInMeter, path):
+    def cartesianResult(self, startInMeter, goalInMeter, path, visited):
+        '''
+        Input
+        @ startInMeter
+        @ goalInMeter
+        @ path
+        @ visited
+        
+        Return
+        '''
         fig = plt.figure()
         ax = plt.subplot(111)
         plt.axis("equal")
@@ -80,6 +89,8 @@ class maper:
             for y in range(self.ylim[0], self.ylim[1]):
                 if self.cartIm[x][y] == 0:
                     ax.fill_between([x, x+1], y, y+1, facecolor='black', linestyle='-')
+        for v in visited:
+            ax.fill_between([v.X, v.X+1], v.Y, v.Y+1, facecolor='silver', linestyle='-')
         # set the start point 
         ax.fill_between([start[0], start[0]+1], start[1], start[1]+1, facecolor='green', linestyle='-')
         # set the goal point
@@ -88,6 +99,9 @@ class maper:
             ax.fill_between([p[0], p[0]+1], p[1], p[1]+1, facecolor='blue', linestyle='-')
         plt.ylim(self.ylim[0], self.ylim[1])
         plt.xlim(self.xlim[0], self.xlim[1])
+        plt.xlabel("pixel")
+        plt.ylabel("pixel")
+        plt.title(f"Warehouse resolution = {self.resolution} m/pixel")
         plt.show()
 
     def preview(self):
@@ -101,9 +115,9 @@ class maper:
 
 def mapUnitTest():
     warehouse = maper('maps/warehouse.pgm')
-    warehouse.degenerate(1)
-    warehouse.createCartesianGridMap()
-    warehouse.cartesianResult([5,10], [10,20], [])
+    warehouse.degenerate(0.1)
+    # warehouse.createCartesianGridMap()
+    # warehouse.cartesianResult([5,10], [10,20], [])
     warehouse.preview()
 
 if __name__ == '__main__':

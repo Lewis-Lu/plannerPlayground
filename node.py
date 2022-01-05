@@ -32,7 +32,7 @@ class node:
 
     def __lt__(self, that):
         ''' less than comparison used in the heap '''
-        return self._F < that.F
+        return self.F < that.F
 
     def __eq__(self, __o: object) -> bool:
         return self._x == __o._x and self._y == __o._y
